@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>simple Vue</title>
+        <style type="text/css" media="screen">
+            .test-zone {
+                border-bottom: 1px solid #888;
+                margin-bottom: 10px;
+                padding: 10px;
+            }
+        </style>
+    </head>
+
+    <body>
+        <div id="myvue">
+            <div class="test-zone">
+                <div v-for="(u , key) in users">
+                    <span>{{ u.name }}</span>
+                    <span> | </span>
+                    <span>{{ u.age }}</span>
+                    <span v-text="u.name"></span>
+                </div>
+                <button @click="chgUsers">chg users</button>
+            </div>
+        </div>
+        <script src="./index.js"></script>
+        <!-- <script src="https://cdn.bootcdn.net/ajax/libs/vue/2.6.11/vue.js"></script> -->
+        <script type="text/javascript" id="">
+            var mv = new Vue({
+                el: "#myvue",
+                data: {
+                    users: [
+                        { name: "zyp", age: 29 },
+                        { name: "sjp", age: 30 },
+                        { name: "lyx", age: 28 },
+                    ],
+                },
+                methods: {
+                    chgUsers() {
+                        this.users = [
+                            { name: "zhaoyupeng", age: 29 },
+                            { name: "songjipeng", age: 28 },
+                            { name: "liyongxiang", age: 0 },
+                            { name: "liyue", age: 35 },
+                        ];
+                    },
+                },
+            });
+        </script>
+    </body>
+</html>
