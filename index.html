@@ -16,13 +16,17 @@
     <body>
         <div id="myvue">
             <div class="test-zone">
-                <div v-for="(u , key) in users">
+                <div v-for="(u , key) in users" class="nouse-class">
                     <span>{{ u.name }}</span>
                     <span> | </span>
-                    <span>{{ u.age }}</span>
-                    <span v-text="u.name"></span>
+                    <span v-text="u.age"></span>
+                    <span> | </span>
+                    <span v-text="u.address"></span>
                 </div>
                 <button @click="chgUsers">chg users</button>
+                <button @click="concatUsers">concat users</button>
+                <span>{{ color }}</span>
+                <span>{{ food }}</span>
             </div>
         </div>
         <script src="./index.js"></script>
@@ -32,19 +36,28 @@
                 el: "#myvue",
                 data: {
                     users: [
-                        { name: "zyp", age: 29 },
-                        { name: "sjp", age: 30 },
-                        { name: "lyx", age: 28 },
+                        { name: "zyp", age: 29, address: "dy" },
+                        { name: "sjp", age: 30, address: "hb" },
+                        { name: "lyx", age: 28, address: "gy" },
                     ],
+                    color: "blue",
+                    food: "rice",
                 },
                 methods: {
                     chgUsers() {
                         this.users = [
-                            { name: "zhaoyupeng", age: 29 },
-                            { name: "songjipeng", age: 28 },
-                            { name: "liyongxiang", age: 0 },
-                            { name: "liyue", age: 35 },
+                            { name: "石头", age: 89, address: "河边" },
+                            { name: "木头", age: 23, address: "山上" },
+                            { name: "马车", age: 5, address: "路上" },
                         ];
+                    },
+                    concatUsers() {
+                        this.users = this.users.concat([
+                            { name: "zhaoyupeng", age: 29, address: "cd" },
+                            { name: "songjipeng", age: 28, address: "cd" },
+                            { name: "liyongxiang", age: 0, address: "cd" },
+                        ]);
+                        console.log("chged");
                     },
                 },
             });

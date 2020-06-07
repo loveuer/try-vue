@@ -1,13 +1,13 @@
 class Vue {
     constructor(options = {}) {
         this.$el = document.querySelector(options.el);
+        this.$BindKeys = ["v-text", "v-html"];
         let data = (this.$data = options.data);
         this.watchTask = {};
         this.proxyData(data);
         this.observer(data);
         this.$methods = options.methods;
         this.compile(this.$el);
-
         // this.showAllData();
     }
     proxyData(data) {
@@ -81,33 +81,35 @@ class Vue {
         }
     }
     compile(el) {
-        el.childNodes.forEach((node) => {
+        let childrenList = el.childNodes;
+        for (let i = 0; i < childrenList.length; i++) {
+            const node = childrenList[i];
             if (node.nodeType === 3) {
                 this.compileText(node);
             } else if (node.nodeType === 1) {
                 if (node.hasAttribute("v-for")) {
                     this.bindForLoop(node);
+                    node.remove();
                 } else {
                     // 循环调用 整个dom树
                     if (node.childNodes.length > 0) {
                         this.compile(node);
                     }
+
                     this.bindModel(node);
                     this.bindClick(node);
 
                     // 处理显示出来的内容
                     if (node.hasAttribute("v-html")) {
                         this.compileText(node, "innerHTML");
-                        return;
                     } else if (node.hasAttribute("v-text")) {
                         this.compileText(node, "innerText");
-                        return;
                     } else {
-                        this.compileText(node);
+                        this.compileText(node, "{{}}");
                     }
                 }
             }
-        });
+        }
     }
     compileText(node, type) {
         let that = this;
@@ -131,42 +133,32 @@ class Vue {
                 break;
             case "innerText":
                 dataKey = node.getAttribute("v-text").trim();
-                if (dataKey.includes(".")) {
-                    let arrayKey = dataKey.split(".");
-                    let renderData = this.$data;
-                    arrayKey.forEach((oneKey) => {
-                        renderData = renderData[oneKey];
-                    });
-                    node[type] = renderData;
-                } else {
-                    node[type] = this[dataKey];
-                }
+                let arrayKey = dataKey.split(".");
+                let renderData = this.$data;
+                arrayKey.forEach((oneKey) => {
+                    renderData = renderData[oneKey];
+                });
+                node[type] = renderData;
 
                 that.watchTask[dataKey].push(new Watch(node, type));
                 node.removeAttribute("v-text");
                 break;
-            default:
-                let reg = /\{\{(.*?)\}\}/g,
-                    txt = node.textContent;
+            case "{{}}":
+                let reg = /\{\{(.*?)\}\}/g;
+                let txt = node.textContent;
                 if (reg.test(txt)) {
-                    node.textContent = txt.replace(reg, (matched, dataKey) => {
-                        dataKey = dataKey.trim();
-                        let resultData;
-                        if (dataKey.includes(".")) {
-                            let arrayKey = dataKey.split(".");
-                            let renderData = this.$data;
-                            arrayKey.forEach((oneKey) => {
-                                renderData = renderData[oneKey];
-                            });
-                            resultData = renderData;
-                        } else {
-                            resultData = this[dataKey];
-                        }
-                        that.watchTask[dataKey].push(
-                            new Watch(node, "textContent")
-                        );
+                    node.textContent = txt.replace(reg, (matched, value) => {
+                        value = value.trim();
+                        let keyArray = value.split(".");
+                        let renderData = this.$data;
+                        keyArray.forEach((ok) => {
+                            renderData = renderData[ok];
+                        });
 
-                        return resultData;
+                        that.watchTask[value].push(
+                            new Watch(node, "innerText")
+                        );
+                        return renderData;
                     });
                 }
         }
@@ -197,51 +189,66 @@ class Vue {
         }
     }
     bindForLoop(node) {
-        if (node.hasAttribute("v-for")) {
-            let forloopStr = node.getAttribute("v-for");
-            node.removeAttribute("v-for");
-            let matchResult = forloopStr.match(/\(.+,.+\)/g);
-            let KandV = matchResult[0].slice(1, matchResult[0].length - 1);
-            // let loopKey = KandV.split(",")[0].trim();
-            let loopVal = KandV.split(",")[0].trim();
-            let rootVal = forloopStr
-                .split(" ")
-                [forloopStr.split(" ").length - 1].trim();
-            Object.keys(this.$data[rootVal]).forEach((onekey) => {
-                let newNode = node.cloneNode(true);
-                this.prefixNodeAttr(newNode, rootVal, onekey);
-                node.parentNode.append(newNode);
-                this.compile(newNode);
-            });
-            node.remove();
-        }
+        let pNode = node.parentNode;
+        let forloopStr = node.getAttribute("v-for");
+        node.removeAttribute("v-for");
+        let matchResult = forloopStr.match(/\(.+,.+\)/g);
+        // let KandV = matchResult[0].slice(1, matchResult[0].length - 1);
+        // let loopKey = KandV.split(",")[0].trim();
+        // let loopVal = KandV.split(",")[0].trim();
+        let rootVal = forloopStr
+            .split(" ")
+            [forloopStr.split(" ").length - 1].trim();
+        Object.keys(this.$data[rootVal]).forEach((onekey) => {
+            let newNode = node.cloneNode(true);
+            this.prefixNodeAttr(newNode, rootVal, onekey);
+            pNode.insertBefore(newNode, node);
+            this.compile(newNode);
+        });
+        // this.watchTask[rootVal] = [new Watch(node, "array", false, this)];
     }
     prefixNodeAttr(node, prefix, keyfix) {
-        if (node.childNodes.length > 0) {
-            node.childNodes.forEach((cn) => {
-                if (cn.nodeType === 1) {
-                    let nodetxt = cn.textContent;
-                    if (nodetxt.match(/\{\{(.*?)\}\}/g)) {
-                        cn.setAttribute(
-                            "v-text",
-                            nodetxt.slice(2, nodetxt.length - 2).trim()
-                        );
-                        cn.textContent = "";
-                    }
-                    this.prefixNodeAttr(cn, prefix, keyfix);
+        let cNodes = node.childNodes;
+        for (let i = 0; i < cNodes.length; i++) {
+            let oneCNode = cNodes[i];
+            if (oneCNode.nodeType === 3) {
+                let txt = oneCNode.textContent;
+                let reg = /\{\{(.*?)\}\}/g;
+                if (reg.test(txt)) {
+                    oneCNode.textContent = txt.replace(
+                        reg,
+                        (matched, value) => {
+                            value = value.trim();
+                            let orgkeyArray = value.split(".");
+                            orgkeyArray.splice(0, 1);
+                            let newKeyArray = [prefix, keyfix].concat(
+                                orgkeyArray
+                            );
+                            let newKey = newKeyArray.join(".");
+                            return `{{ ${newKey} }}`;
+                        }
+                    );
                 }
-            });
-        }
+            } else if (oneCNode.nodeType === 1) {
+                if (oneCNode.childNodes.length > 0) {
+                    this.prefixNodeAttr(oneCNode, prefix, keyfix);
+                }
 
-        let attrs = node.attributes;
-        for (let i = 0; i < attrs.length; i++) {
-            let orgAttrName = attrs[i].name;
-            let orgAttrVal = attrs[i].value.split(".");
-            orgAttrVal.splice(0, 1);
-            let newAttrValArray = [prefix, keyfix].concat(orgAttrVal);
-            let newAttrVal = newAttrValArray.join(".");
-            node.setAttribute(orgAttrName, newAttrVal);
-            this.watchTask[newAttrVal] = this.watchTask[newAttrVal] || [];
+                // replace attrs
+                let attrs = oneCNode.attributes;
+                for (let j = 0; j < attrs.length; j++) {
+                    let orgAttrName = attrs[j].name;
+                    let orgAttrVal = attrs[j].value.split(".");
+                    orgAttrVal.splice(0, 1);
+                    let newAttrValArray = [prefix, keyfix].concat(orgAttrVal);
+                    let newAttrVal = newAttrValArray.join(".");
+                    if (this.$BindKeys.includes(orgAttrName)) {
+                        oneCNode.setAttribute(orgAttrName, newAttrVal);
+                    }
+                    // this.watchTask[newAttrVal] = this.watchTask[newAttrVal] || [];
+                    this.watchTask[newAttrVal] = [];
+                }
+            }
         }
     }
     // get method key and method params
@@ -292,7 +299,10 @@ class Watch {
         if (this.ifAttr) {
             this.node.setAttribute(this.type, newVal);
         } else {
-            this.node[this.type] = newVal;
+            if (this.type === "array") {
+            } else {
+                this.node[this.type] = newVal;
+            }
         }
     }
 }
